@@ -1,0 +1,75 @@
+```{r echo=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+#Severe Weather Events health and economic impact analysis of NOOA Storm Database   
+***
+
+##Synopsis
+***
+
+
+## Data processing
+***
+
+### Reading the data
+This is based on NOAA Storm Database Analysis coming in the form of a  [*bz2-file*](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) located on coursera Assignment Page.
+To use the data, initially we are going to strip white spaces and modify how to identify NA values by using "" as a valid NA.  
+
+```{r stepsreading}
+bzfileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(bzfileUrl, destfile = paste0(getwd(), "/StormData.csv.bz2"), method = "curl")
+stormdata <- read.table("StormData.csv.bz2", header = TRUE, sep = ",", strip.white = TRUE, stringsAsFactors = FALSE, na.strings = c("NA",""))
+str(stormdata)
+```
+
+### Assesing data quality 
+As per provided data, STATE variable has not just US state but US territories and maritime zones.  
+```{r}
+unique(stormdata$STATE)
+```
+
+Upon inspection, Event Type is a character variable that has both lowercase and upper case characters, we will make all upper case.
+```{r}
+stormdata$EVTYPE <- toupper(stormdata$EVTYPE)
+```
+
+Upon content analysis we can observe several 'obvious' typos on event type designation which leads to identify several real and potential dupplication cases, there are *`r NROW(unique(stormdata$EVTYPE))`* different Event Type vallues which a much higher number than 48 mentionened possible values on acompanyng [NOAA Storm Data Documentation from Assignment](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) . 
+
+```{r}
+NROW(unique(stormdata$EVTYPE))
+```
+
+Regarding dates and time zones, although dates are properly formate, time is not so a colon is added, and then the Time Zones need to be set according R lubridate package OlsonNames functions to standardize proper time tracking, for this last Step as per convenience a change to a TZ city will be done.
+
+```{r}
+stormdata$TIME_ZONE <- toupper(stormdata$TIME_ZONE)
+unique(stormdata$TIME_ZONE)
+ stormdata <- stormdata %>% 
+                mutate(BEGINDATETIME = 
+                        mdy_hms(stormdata$BGN_DATE) + 
+                        hm(paste0(substr(stormdata$BGN_TIME,1,2),":",substr(stormdata$BGN_TIME,3,4))))
+```
+
+To stream Line the monetary impact analysis, we will create PROPDMGUSD and CROPDMGUSD using convention of K meaning 1,000 USD, M meaning 1,000,000 USD and B meaning 1,000,000,000
+Several other vars, as show in annex, have too much garbage on them to be properly processed:
+* COUNTYNAME has *`r NROW(unique(stormdata$COUNTYNAME))`* unique values, which upon ordering show that out of first 1000, 90% are a variation of *"AKZ001xxx"*  
+
+Further 
+
+## Results
+***
+### Personal Impact
+
+
+### Economic Impact
+
+
+### Notes
+***
+We must have AT LEAST 1 Plot and no more than 3
+
+

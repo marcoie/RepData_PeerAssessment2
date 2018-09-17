@@ -1,75 +1,259 @@
 ```{r echo=FALSE, message=FALSE}
-library(dplyr)
-library(ggplot2)
-library(lubridate)
 knitr::opts_chunk$set(cache = TRUE)
 ```
 
-#Severe Weather Events health and economic impact analysis of NOOA Storm Database   
+#Public health and Economic Impact of Severe Weather Events in the US 
 ***
 
 ##Synopsis
 ***
-
+The objective of this publication is to do an analysis on the NOAA Storm Database (a weather events information dataset) and identify the most impacting weather events to the public health and to the economy of the US so that authorities can properly plan an assign resources to prepare for these type of events.
+To this extend the analysis will take into consideration fatalities and injuries as well as crop and property damage from each event.
 
 ## Data processing
 ***
 
+###R Libraries to be used
+```{r message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+```
+
 ### Reading the data
-This is based on NOAA Storm Database Analysis coming in the form of a  [*bz2-file*](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) located on coursera Assignment Page.
+This is based on NOAA Storm Database Analysis coming in the form of a bz2 file at this link   [*NOAA Storm Data*](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) located on coursera Assignment Page. Additional sources include a [Documentation Reference](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) for this data from National Weather Service and National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf) for same data.  
+
 To use the data, initially we are going to strip white spaces and modify how to identify NA values by using "" as a valid NA.  
 
 ```{r stepsreading}
 bzfileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(bzfileUrl, destfile = paste0(getwd(), "/StormData.csv.bz2"), method = "curl")
 stormdata <- read.table("StormData.csv.bz2", header = TRUE, sep = ",", strip.white = TRUE, stringsAsFactors = FALSE, na.strings = c("NA",""))
-str(stormdata)
 ```
 
-### Assesing data quality 
-As per provided data, STATE variable has not just US state but US territories and maritime zones.  
+After loading the data, we end up with a total of **`r NROW(stormdata)`** observations of weather event/reports (look Apendixes and Notes at the end to check data structure).  
+
+### Data quality check 
+
+####The STATE geographical element
+Is worth to highlight that the STATE variable has not just US state but US territories and maritime zones up to a total of **`r NROW(unique(stormdata$STATE))`**   
 ```{r}
 unique(stormdata$STATE)
 ```
 
-Upon inspection, Event Type is a character variable that has both lowercase and upper case characters, we will make all upper case.
+####The EVENT TYPE classification
+To identify the nature of the weather event, according to documentation, we must use the **Event Type**, upon initial inspection and preprocessing there will be **`r NROW(unique(stormdata$EVTYPE))`** different types values whihc is more than twenty times more than the 48 types documented in [NOAA Storm Data Documentation from Assignment](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) (See apendixes and notes at the end to find all different Event Types)   
+
+Upon inspection of the variable we notice that is of character type and that it has both lowercase and upper case text, also it has several typos on the event description spelling; we will address theese issues by taking a copy to a new variable EVENT_TYPE using only uppercase values and then we will fix the common typos detected including some inner white space reduction:  
 ```{r}
 stormdata$EVTYPE <- toupper(stormdata$EVTYPE)
+stormdata$EVENT_TYPE <- stormdata$EVTYPE
+stormdata$EVENT_TYPE <- trimws(stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("  "," ",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("  "," ",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("  "," ",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("AVALANCE","AVALANCHE",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("EROSIN","EROSION",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("EROSIN","EROSION",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("BRUSH FIRES","BRUSH FIRE",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("MIRCOBURST","MICROBURST",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("MICOBURST","MICROBURST",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("DUSTSTORM","DUST STORM",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("FLOOODING","FLOODING",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("FLD","FLOODING",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("FLOODIN\\>","FLOODING",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("FLASHFLOOD","FLASH FLOOD",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("FLASH/FLOOD","FLASH FLOOD",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("HEATBURST","HEAT BURST",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("PRECIPATATION","PRECIPITATION",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("ANDBLOWING","AND BLOWING",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("LIGNTNING","LIGHTNING",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("THUDERSTORM|THUNDEERSTORM|THUNDERESTORM|THUNDERSTORMW|THUNDERSTROM|THUNDESTORM|THUNERSTORM|TUNDERSTORM|TSTM","THUNDERSTORM",
+                             stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("TORNDAO|TORNADOES","TORNADO",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("WAYTERSPOUT","WATERSPOUT",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("WND","WIND",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("WINTRY","WINTERY",stormdata$EVENT_TYPE)
+stormdata$EVENT_TYPE <- gsub("VOG","FOG",stormdata$EVENT_TYPE)
 ```
 
-Upon content analysis we can observe several 'obvious' typos on event type designation which leads to identify several real and potential dupplication cases, there are *`r NROW(unique(stormdata$EVTYPE))`* different Event Type vallues which a much higher number than 48 mentionened possible values on acompanyng [NOAA Storm Data Documentation from Assignment](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) . 
+Finally, to properly asses the events impact, we must "reduce" the number of the diverse 800+ values to a more manegeable number closer to the 48 defined NOAA values. This will be achieved by creating a new column EVENT_CLASS that will be matched as best as possible to one of the 48 NOAA values (some NOAA values will be clashed together), if no possible match is found a "NON STANDARD" value will be assigned.
 
 ```{r}
-NROW(unique(stormdata$EVTYPE))
+stormdata <- stormdata %>% 
+                mutate(EVENT_CLASS =  
+                    case_when(
+                        regexpr(glob2rx("*LOW TIDE*"),EVENT_TYPE) !=-1 ~ "ASTRONOMICAL LOW TIDE", 
+                        regexpr(glob2rx("*HIGH TIDE*"),EVENT_TYPE) !=-1 ~ "ASTRONOMICAL HIGH TIDE", 
+                        regexpr(glob2rx("*AVALANCHE*"),EVENT_TYPE) !=-1 ~ "AVALANCHE", 
+                        regexpr(glob2rx("*COASTAL FLOOD*"),EVENT_TYPE) !=-1 ~ "COASTAL FLOOD", 
+                        (regexpr(glob2rx("*WIND CHILL*"),EVENT_TYPE) !=-1)|(regexpr(glob2rx("*COLD*"),EVENT_TYPE) !=-1) ~ "COLD/WIND CHILL (EXTREME)", 
+                        regexpr(glob2rx("*DENSE SMOKE*"),EVENT_TYPE) !=-1 ~ "DENSE SMOKE", 
+                        regexpr(glob2rx("*DENSE FOG*|FOG"),EVENT_TYPE) !=-1 ~ "FOG|DENSE FOG", 
+                        (regexpr(glob2rx("*DUST DEVIL*"),EVENT_TYPE) !=-1)|(regexpr(glob2rx("*DUST STORM*"),EVENT_TYPE) !=-1) ~ "DUST DEVIL/STORM", 
+                        regexpr(glob2rx("*HEAT*"),EVENT_TYPE) !=-1 ~ "HEAT/(EXCESSIVE HEAT)", 
+                        regexpr(glob2rx("*FLOOD*|*SURGE*"),EVENT_TYPE) !=-1 ~ "FLOOD,FLASH FLOOD,SURGE)", 
+                        regexpr(glob2rx("*FREEZ*"),EVENT_TYPE) !=-1 ~ "FREEZING|FROST", 
+                        regexpr(glob2rx("*FUNNEL*"),EVENT_TYPE) !=-1 ~ "FUNNEL CLOUD", 
+                        regexpr(glob2rx("*HAIL*"),EVENT_TYPE) !=-1 ~ "HAIL", 
+                        regexpr(glob2rx("*RAIN*|*PRECIPI*"),EVENT_TYPE) !=-1 ~ "RAIN (HEAVY)", 
+                        regexpr(glob2rx("*SNOW*|*BLIZZ*"),EVENT_TYPE) !=-1 ~ "SNOW (HEAVY)|BLIZZARD", 
+                        regexpr(glob2rx("*SURF*|HI*WAV*|*SEAS"),EVENT_TYPE) !=-1 ~ "SURF/SEAS (HEAVY/HIGH)", 
+                        (regexpr(glob2rx("*HURRI*"),EVENT_TYPE) !=-1)|(regexpr(glob2rx("*TYPHO*"),EVENT_TYPE) !=-1) ~ "HURRICANE/TYPHOON", 
+                        regexpr(glob2rx("*ICE*|*GLAZE*|*ICY*|*LOW*TEMP*|*HYP*|*FROS*"),EVENT_TYPE) !=-1 ~ "ICE|GLAZE EVENT", 
+                        regexpr(glob2rx("*LIGHTNING*"),EVENT_TYPE) !=-1 ~ "LIGHTNING", 
+                        regexpr(glob2rx("*G*WIND*|*WIND*|*MICRO*"),EVENT_TYPE) !=-1 ~ "WIND EVENT (MICROBURST)", 
+                        regexpr(glob2rx("*HIGH WIND*"),EVENT_TYPE) !=-1 ~ "HIGH WIND", 
+                        regexpr(glob2rx("*MARINE*WIND*"),EVENT_TYPE) !=-1 ~ "MARINE WIND EVENT", 
+                        regexpr(glob2rx("*RIP*"),EVENT_TYPE) !=-1 ~ "RIP CURRENT", 
+                        regexpr(glob2rx("*SEICHE*"),EVENT_TYPE) !=-1 ~ "SEICHE", 
+                        regexpr(glob2rx("*SLEET*"),EVENT_TYPE) !=-1 ~ "SLEET", 
+                        regexpr(glob2rx("*STORM*TIDE*"),EVENT_TYPE) !=-1 ~ "STORM TIDE", 
+                        regexpr(glob2rx("*STRONG*WIND*"),EVENT_TYPE) !=-1 ~ "STRONG WIND", 
+                        (regexpr(glob2rx("*THUNDERSTOR*"),EVENT_TYPE) !=-1)|(regexpr(glob2rx("*GUSTNA*|*DOWNBU*"),EVENT_TYPE) !=-1) ~ "THUNDERSTORM EVENTS", 
+                        (regexpr(glob2rx("*TORNADO*"),EVENT_TYPE) !=-1)|(regexpr(glob2rx("*WATERSP*|*LANDSPOUTS*"),EVENT_TYPE) !=-1) ~ "TORNADO", 
+                        regexpr(glob2rx("*TROPI*"),EVENT_TYPE) !=-1 ~ "TROPICAL STORM/DEPRESSION", 
+                        regexpr(glob2rx("C*STORM*"),EVENT_TYPE) !=-1 ~ "COASTAL STORM", 
+                        regexpr(glob2rx("*TSUNAM*"),EVENT_TYPE) !=-1 ~ "TSUNAMI", 
+                        regexpr(glob2rx("*SLIDE*"),EVENT_TYPE) !=-1 ~ "LANDSLIDE-MUDSLIDE", 
+                        regexpr(glob2rx("*VOLCA*"),EVENT_TYPE) !=-1 ~ "VOLCANIC EVENT", 
+                        regexpr(glob2rx("*WILD*FIRE*|*FORE*FIRE*"),EVENT_TYPE) !=-1 ~ "WILD/FOREST FIRE", 
+                        regexpr(glob2rx("*WET*"),EVENT_TYPE) !=-1 ~ "WET/WETNESS EVENT", 
+                        regexpr(glob2rx("*WINTER*"),EVENT_TYPE) !=-1 ~ "WINTER STORM/WEATHER", 
+                        regexpr(glob2rx("*DROUGHT*"),EVENT_TYPE) !=-1 ~ "DROUGHT", 
+                        TRUE ~ "NON STANDARD")
+                )
 ```
 
-Regarding dates and time zones, although dates are properly formate, time is not so a colon is added, and then the Time Zones need to be set according R lubridate package OlsonNames functions to standardize proper time tracking, for this last Step as per convenience a change to a TZ city will be done.
 
+After the previous artifacts and typos removal, plus the simplified classification of EVENTS we end up with the following number of event classes and number of observations where no class could be assigned, note that this will be **`r scales::percent(NROW(stormdata[stormdata$EVENT_CLASS=="NON STANDARD",])/NROW(stormdata))`** of the total observations.    
 ```{r}
-stormdata$TIME_ZONE <- toupper(stormdata$TIME_ZONE)
-unique(stormdata$TIME_ZONE)
- stormdata <- stormdata %>% 
+NROW(unique(stormdata$EVENT_CLASS))
+sort(unique(stormdata$EVENT_CLASS))
+NROW(stormdata[stormdata$EVENT_CLASS=="NON STANDARD",])
+```
+
+####The date of event Begin
+Regarding dates and time zones, although dates are properly formated time is not so a colon is added to the text and a new variable BEGINDATETIME is created.    
+```{r}
+stormdata <- stormdata %>% 
                 mutate(BEGINDATETIME = 
                         mdy_hms(stormdata$BGN_DATE) + 
                         hm(paste0(substr(stormdata$BGN_TIME,1,2),":",substr(stormdata$BGN_TIME,3,4))))
 ```
 
-To stream Line the monetary impact analysis, we will create PROPDMGUSD and CROPDMGUSD using convention of K meaning 1,000 USD, M meaning 1,000,000 USD and B meaning 1,000,000,000
-Several other vars, as show in annex, have too much garbage on them to be properly processed:
-* COUNTYNAME has *`r NROW(unique(stormdata$COUNTYNAME))`* unique values, which upon ordering show that out of first 1000, 90% are a variation of *"AKZ001xxx"*  
+Rgarding Time Zones they are not actually part of the event begin date, and also do not follow exactly the standards. As for this analysis we won' use the time zone as a critical factor, but for propper time management a fix is needed.  
+```{r}
+stormdata$TIME_ZONE <- toupper(stormdata$TIME_ZONE)
+unique(stormdata$TIME_ZONE)
+```
 
-Further 
+#### Identifyig and preparing the damage calculation variables
+As a precaution, since current data set variables description is not clear and not provided, I will do refer to (current version of NOAA storm database)[http://www1.ncdc.noaa.gov/pub/data/swdi/stormevents/csvfiles/Storm-Data-Export-Format.docx] to handle the definition of our variables of interest.  
+  
+According to documentation, there are 2 variables that identify health related damage **FATALITIES** and **INJURIES** and both provide only the direct cases. To simplify we will add one variable **VICTIMS** as the sum of both.    
+
+```{r}
+stormdata <- stormdata %>%  mutate( VICTIMS = FATALITIES + INJURIES)
+```
+
+In the case of the economic damage we will refer to variables **CROPDMG/CROPDMGEXP** and **PRODMG/PROPDMGEXP**. The xDMG variables have a value that indicate the estimation, while xDMGEXP represents a multiplier USD factor. Bellow we will show current unque values, once we set all up to UPPER CASE to standardize, and also the distribution of observations per unique value: 
+
+```{r}
+stormdata$PROPDMGEXP <- toupper(stormdata$PROPDMGEXP)
+unique(stormdata$PROPDMGEXP)
+kable(stormdata %>% group_by(PROPDMGEXP) %>% summarise(num_obs=n(), simple_dmg_sum = sum(PROPDMG)),format = "html") %>% kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),full_width = F)
+```
+
+For crop damage we will use the rule of multiplying CROPDMG value by 1.000.000.000 = "B", 1.000.000 = "M" ans 1.000 = "K", remaining PROPDMGEXP values will be taken as "zero", including N.A. See under Apendixes and NOtes at the end the list of events with PRODMGEXP = NA and positive PROPDMG.
+
+```{r}
+stormdata$CROPDMGEXP <- toupper(stormdata$CROPDMGEXP)
+unique(stormdata$CROPDMGEXP)
+kable(stormdata %>% group_by(CROPDMGEXP) %>% summarise(num_obs = n(), simple_dmg_sum = sum(CROPDMG)),format = "html") %>% kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),full_width = F)
+```
+
+For crop damage we will use the rul eof multiplying CROPDMG value by 1.000.000.000 = "B", 1.000.000 = "M" ans 1.000 = "K", remaining CROPDMGEXP values will be taken as "zero", including N.A. since there are only 3 NA CROPDMGEXP with CROPDMG greater thatn zero.
+
+once calculation rules are defined we will and *PROPDMGVAL*, *CROPDMGVAL* and *ECONDMGVAL* all in USD following above rules, ECONDMGVAL will be the sum of PROPDMGVAL and CROPDMGVAL.
+
+```{r}
+stormdata <- stormdata %>% 
+                mutate(
+                    PROPDMGVAL = PROPDMG * case_when(PROPDMGEXP == "M" ~ 1000000, 
+                                                     PROPDMGEXP == "B" ~ 1000000000, 
+                                                     PROPDMGEXP == "K" ~ 1000, 
+                                                     PROPDMGEXP == "H" ~ 100,
+                                                     TRUE ~ 0),
+                    CROPDMGVAL = CROPDMG * case_when(CROPDMGEXP == "M" ~ 1000000, 
+                                                     CROPDMGEXP == "B" ~ 1000000000, 
+                                                     CROPDMGEXP == "K" ~ 1000, 
+                                                     TRUE ~ 0),
+                    ECONDMGVAL = PROPDMGVAL + CROPDMGVAL
+                    )
+
+```
+
 
 ## Results
 ***
-### Personal Impact
+
+After data adjustment, bellow you can find the simplified list of what is the health and the economic impact of weather events across US and terriories    
+
+### Health Impact, 10 highest contributors
+
+Based on fatalities and injuries count, bellow is graph that shows the 10 most impacting type of events.  
+
+```{r}
+health_impact_data <- head(stormdata %>% group_by(EVENT_CLASS) %>% 
+                               summarise(healthimpact = sum(VICTIMS)) %>% 
+                               arrange(desc(healthimpact)),
+                           10)
+
+ggplot(health_impact_data, aes(x=EVENT_CLASS, y=healthimpact)) + 
+        geom_col() + coord_flip() + 
+        labs(title = "Public Health Impact by Weather Event", x=element_blank(), y="Victims Count (Thousands)")  +
+        scale_y_continuous(labels = scales::comma_format(scale=1/1000)) + 
+        scale_x_discrete(limits = health_impact_data$EVENT_CLASS)
+```
 
 
-### Economic Impact
+### Economic Impact - 10 Highest contributors
+
+Based on property and crop combined damage value, bellow is graph that shows the 10 most impacting type of events.  
+
+```{r}
+econom_impact_data <- head(stormdata %>% group_by(EVENT_CLASS) %>% 
+                               summarise(economicimpact = sum(ECONDMGVAL)) %>% 
+                               arrange(desc(economicimpact)),
+                           10)
+
+ggplot(econom_impact_data, aes(x=EVENT_CLASS, y=economicimpact)) + 
+        geom_col() + coord_flip() + 
+        labs(title = "Economic Impact by Weather Event", x=element_blank(), y="USD Millions")  +
+        scale_y_continuous(labels = scales::dollar_format(scale=1/1000000)) + 
+        scale_x_discrete(limits = econom_impact_data$EVENT_CLASS)
+```
 
 
-### Notes
+## Apendixes and Notes
 ***
-We must have AT LEAST 1 Plot and no more than 3
+### Storm Data Structure
+```{r}
+str(stormdata)
+```
+### Original 898 Event Types with typos and spelling issues
+```{r}
+sort(unique(stormdata$EVTYPE))
+```
 
+### Unexisting PROPDMGEXP with positive PROPDMG
+```{r}
+kable(stormdata %>% filter(is.na(PROPDMGEXP) & PROPDMG>0) %>% select(EVENT_TYPE,STATE, BGN_DATE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP),format = "html") %>% kableExtra::kable_styling(bootstrap_options = c("condensed"),full_width = F)
+```
 
+### Unexisting CROPDMGEXP with positive CROPDMG
+```{r}
+kable(stormdata %>% filter(is.na(CROPDMGEXP) & CROPDMG>0) %>% select(EVENT_TYPE,STATE, BGN_DATE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP),format = "html") %>% kableExtra::kable_styling(bootstrap_options = c("condensed"),full_width = F)
+```

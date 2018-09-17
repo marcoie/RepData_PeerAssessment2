@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/420456/94db77973f40417da8d177cb5fee383d
+bundleId: https://api.rpubs.com/api/v1/document/420456/94db77973f40417da8d177cb5fee383d
+url: http://rpubs.com/marcoie69/420456
+when: 1537140451.25839
